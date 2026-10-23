@@ -31,7 +31,7 @@
   ],
   "homepage": "https://augmentev.com/fabric-verify",
   "bugs": {
-    "url": "https://github.com/augmentev/fabric-verify-mcp/issues",
+    "url": "https://github.com/AugmentEVzero/fabric-verify-mcp/issues",
     "email": "support@augmentev.com"
   },
   "license": "Apache-2.0",
@@ -44,6 +44,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/augmentev/fabric-verify-mcp.git"
+    "url": "git+https://github.com/AugmentEVzero/fabric-verify-mcp.git"
   }
 }
