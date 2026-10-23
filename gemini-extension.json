@@ -1,0 +1,11 @@
+{
+  "name": "fabric-verify",
+  "version": "0.2.1",
+  "description": "Signed, publicly logged records of what your AI agent did, with proofs anyone can check offline.",
+  "mcpServers": {
+    "fabric-verify": {
+      "httpUrl": "https://mcp.augmentev.com/mcp"
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}
