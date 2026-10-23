@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "fabric-verify": {
+      "url": "https://mcp.augmentev.com/mcp"
+    }
+  }
+}
