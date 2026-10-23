@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.augmentev/fabric-verify",
+  "description": "Signed, publicly logged records of what your AI agent did, with proofs anyone can check offline.",
+  "title": "Fabric Verify",
+  "version": "0.2.1",
+  "websiteUrl": "https://augmentev.com/fabric-verify",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@augmentev/fabric-verify-mcp",
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Your Fabric Verify credit key (fvk_...). Buy credit at https://augmentev.com/pricing#buy; the key is shown once after payment.",
+          "isRequired": true,
+          "isSecret": true,
+          "name": "FABRIC_CREDIT_KEY"
+        },
+        {
+          "description": "A stable name for this agent, e.g. billing-agent (printable ASCII, no spaces). Default: mcp-agent.",
+          "name": "FABRIC_AGENT"
+        },
+        {
+          "description": "Most this server may spend per session, in US dollars ($0.005 per record). Default: 1.",
+          "name": "FABRIC_MAX_SPEND_USD"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.augmentev.com/mcp"
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/augmentev/fabric-verify-mcp",
+    "source": "github"
+  }
+}
