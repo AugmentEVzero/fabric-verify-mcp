@@ -17,6 +17,6 @@ A proof shows that an exact record existed, unchanged, by a certain time, and wh
 
 Only a salted fingerprint of the action summary is stored, never the summary itself. Action details stay private: the public log holds only a salted fingerprint, the action kind and time, and coded identifiers that only you, or an auditor you give an audit pack to, can link to your assistant. Records are permanent. Keep personal data out of agent names.
 
-Records made through this remote connector are signed by a key AugmentEV hosts for your account and are labelled "augmentev-hosted". For records signed by a key only your agent holds, use the local connector: `npx -y @augmentev/fabric-verify-mcp`.
+Records made through this remote connector are signed by a key AugmentEV hosts for your account and are labelled "augmentev-hosted"; only this connector can make records with that label. For records signed by a key only your agent holds, use the local connector: `npx -y @augmentev/fabric-verify-mcp`.
 
 Credit: https://augmentev.com/pricing · Support: support@augmentev.com

@@ -10,5 +10,6 @@
   "homepage": "https://augmentev.com/fabric-verify",
   "repository": "https://github.com/AugmentEVzero/fabric-verify-mcp",
   "license": "Apache-2.0",
+  "logo": "assets/logo.png",
   "keywords": ["mcp", "ai-agents", "audit", "transparency-log", "proof"]
 }

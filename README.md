@@ -42,6 +42,14 @@ In Claude Code:
 claude mcp add fabric-verify --env FABRIC_CREDIT_KEY=fvk_... --env FABRIC_AGENT=my-agent -- npx -y @augmentev/fabric-verify-mcp
 ```
 
+## Remote connector
+
+The Cursor plugin (`.cursor-plugin/plugin.json` and `mcp.json`) and the Gemini CLI extension (`gemini-extension.json`) in this repository don't run this package. They connect to the hosted server at `https://mcp.augmentev.com/mcp`, the address chat apps use as a custom connector. There is nothing to install.
+
+When an app connects, it sends you to a sign-in page where you enter your credit key, a name for the assistant and a daily spending limit ($0.50 to $20). The app gets an access token, not your key.
+
+The remote connector has four tools: `record_action`, `record_event`, `get_proof` and `check_balance`. Records made through it are signed by a key AugmentEV hosts for your account and are labelled "augmentev-hosted"; only this connector can make records with that label. For records signed by a key only your agent holds, use the package above.
+
 ## Settings
 
 | Variable | Default | Meaning |
