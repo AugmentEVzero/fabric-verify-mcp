@@ -1,6 +1,6 @@
 {
   "name": "@augmentev/fabric-verify-mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "MCP server for Fabric Verify: your agent signs a record of each action locally and gets a public, offline-checkable proof that the record existed, unchanged, by a certain time.",
   "mcpName": "ai.augmentev/fabric-verify",
   "type": "module",
@@ -18,7 +18,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/unit.test.js",
+    "test": "node --test test/unit.test.js test/agent-event.test.js",
     "test:e2e": "node --test test/e2e.test.js"
   },
   "keywords": [

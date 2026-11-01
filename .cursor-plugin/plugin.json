@@ -1,7 +1,7 @@
 {
   "name": "fabric-verify",
   "displayName": "Fabric Verify",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Signed, publicly logged records of what your AI agent did, with proofs anyone can check offline. A proof shows a record existed, unchanged, by a certain time, not that its content is true.",
   "author": {
     "name": "AugmentEV",

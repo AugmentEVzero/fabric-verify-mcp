@@ -3,14 +3,14 @@
   "name": "ai.augmentev/fabric-verify",
   "description": "Signed, publicly logged records of what your AI agent did, with proofs anyone can check offline.",
   "title": "Fabric Verify",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "websiteUrl": "https://augmentev.com/fabric-verify",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@augmentev/fabric-verify-mcp",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },

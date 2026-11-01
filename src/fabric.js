@@ -6,16 +6,19 @@
 // name (kid), the action kind, the agent's clock time, the public key, the signature and a
 // salted SHA-256 fingerprint of the summary. The summary text and salt stay on this machine.
 import { generateKeyPairSync, createPrivateKey, createPublicKey, sign, randomBytes, createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, renameSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { BUNDLE_FORMAT, EventError, buildEvent, eventKind } from "./agent-event.js";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.2.0";
 export const CONTEXT = "augmentev-fabric-log-statement-v1\n";
 export const KINDS = [
   "tool_call", "model_output", "message_sent", "data_read", "data_write", "file_write",
   "payment", "approval", "decision", "credential_use", "deployment", "other",
 ];
+/** Kinds a record may be signed under: KINDS plus proxy_policy, which only policy_set events use. */
+export const LOG_KINDS = [...KINDS, "proxy_policy"];
 export const PRICE_MICROS = 5_000; // $0.005 per record
 export const TOPUP_AMOUNTS = [25, 50, 100, 500];
 export const BUY_URL = "https://augmentev.com/pricing#buy";
@@ -108,7 +111,7 @@ export function utcSeconds(d = new Date()) {
 
 /** Build and sign one record. The payload itself is never part of the request. */
 export function makeRecord(sk, { agent, kid, kind, payload, now = new Date(), salt = randomBytes(32) }) {
-  if (!KINDS.includes(kind)) throw new FabricError(`kind must be one of: ${KINDS.join(", ")}`);
+  if (!LOG_KINDS.includes(kind)) throw new FabricError(`kind must be one of: ${KINDS.join(", ")}`);
   const statement = {
     agent, kid, kind,
     payload_sha256: createHash("sha256").update(salt).update(payload).digest("hex"),
@@ -169,9 +172,9 @@ export class FabricClient {
   }
 
   async errorFrom(r) {
-    let code, message;
+    let code, message, j = {};
     try {
-      const j = await r.json();
+      j = await r.json();
       code = clean(j.error ?? j.code, 64);
       message = clean(j.message ?? j.detail);
     } catch { /* non-JSON body */ }
@@ -184,6 +187,9 @@ export class FabricClient {
       429: "Too many requests. Wait and retry.",
       503: "Fabric Verify is temporarily unavailable.",
     };
+    if (r.status === 403 && code === "governance_refused") {
+      map[403] = `Refused by this account's governance policy or a halt (rule ${clean(j.rule_id, 32) || "unknown"}, reason ${clean(j.reason_code, 64) || "unknown"}). Nothing was charged or recorded.`;
+    }
     if (r.status === 409 && /already registered with a different public key/.test(message ?? "")) {
       map[409] = `The key name "${this.cfg.kid}" is already bound to a different agent key (each key name belongs to one key, forever). ` +
         `Restore the original agent-ed25519.pem in ${this.cfg.home}, or set a new FABRIC_KID such as "${this.cfg.agent}-key-2".`;
@@ -199,8 +205,20 @@ export class FabricClient {
     return join(dir, `${createHash("sha256").update(idem).digest("hex").slice(0, 32)}.json`);
   }
 
+  /**
+   * The `governance` part of an append: the approval is presented only when the
+   * account's policy gates this kind (naming one for an ungated kind is refused).
+   */
+  async governanceFor(kind, approvalRecord) {
+    if (!approvalRecord) return undefined;
+    const r = await this.request("GET", "/v1/governance/policy", { retries: 2 });
+    if (!r.ok) return undefined; // no policy service: the record still links its approval
+    const j = await r.json().catch(() => ({}));
+    return j?.policy?.approval?.kinds?.includes(kind) ? { approval_record: approvalRecord } : undefined;
+  }
+
   /** Sign and append one record. Spends $0.005 of credit. */
-  async recordAction({ kind, summary, idempotencyKey }) {
+  async recordAction({ kind, summary, idempotencyKey, approvalRecord, event }) {
     this.requireKey();
     // Reserve before sending, so parallel calls cannot overshoot the session cap.
     if (this.spentMicros + this.reservedMicros + PRICE_MICROS > this.cfg.maxSpendMicros) {
@@ -215,7 +233,7 @@ export class FabricClient {
         pPath = this.pendingPath(idempotencyKey);
         if (existsSync(pPath)) {
           pending = JSON.parse(readFileSync(pPath, "utf8"));
-          if (pending.summary !== summary || pending.kind !== kind) {
+          if (pending.summary !== summary || pending.kind !== kind || (pending.approval_record ?? null) !== (approvalRecord ?? null)) {
             throw new FabricError("This idempotency_key was already used for a different action. Use a new key for a new action.", { code: "idempotency_mismatch" });
           }
         }
@@ -229,9 +247,10 @@ export class FabricClient {
       }
       const idem = idempotencyKey || body.statement.payload_sha256.slice(0, 32);
       pPath ??= this.pendingPath(idem);
-      if (!pending) writePrivate(pPath, JSON.stringify({ idempotency_key: idem, kind, summary, salt_hex: salt.toString("hex"), request: body }));
+      if (!pending) writePrivate(pPath, JSON.stringify({ idempotency_key: idem, kind, summary, approval_record: approvalRecord, salt_hex: salt.toString("hex"), request: body }));
 
-      const r = await this.request("POST", "/v1/log/append", { body, headers: { "idempotency-key": idem }, retries: 3 });
+      const governance = await this.governanceFor(kind, approvalRecord);
+      const r = await this.request("POST", "/v1/log/append", { body: governance ? { ...body, governance } : body, headers: { "idempotency-key": idem }, retries: 3 });
       if (!r.ok) {
         const err = await this.errorFrom(r);
         if (err.retryable || r.status >= 500) {
@@ -248,7 +267,7 @@ export class FabricClient {
       const balance = Number(r.headers.get("x-fabric-credit-balance-micros"));
       const dir = this.newRecordDir(index, body.statement.payload_sha256);
       writePrivate(join(dir, "record.json"), JSON.stringify({
-        index, kind, client_time: body.statement.client_time,
+        index, kind, ...(event ? { event: event.event, run_id: event.runId ?? null } : {}), client_time: body.statement.client_time,
         salt_hex: salt.toString("hex"), payload: summary, payload_sha256: body.statement.payload_sha256,
         request: body, receipt: reply, api: this.cfg.api,
       }, null, 2));
@@ -264,6 +283,66 @@ export class FabricClient {
     } finally {
       this.reservedMicros -= PRICE_MICROS;
     }
+  }
+
+  /**
+   * Sign and append one agent event (augmentev/fabric-agent-event/v1) as the
+   * record's payload. Spends $0.005 of credit. The event is kept here with its
+   * salt; `record` (its payload_sha256) is what later events link to.
+   */
+  async recordEvent({ event, kind, body, runId, stepId, parentRecord, delegationRecord, action, idempotencyKey }) {
+    let built;
+    try {
+      kind = eventKind(event, kind);
+      built = await buildEvent({ event, agentId: this.cfg.agent, keyId: this.cfg.kid, body, runId, stepId, parentRecord, delegationRecord, action });
+    } catch (e) {
+      if (e instanceof EventError) throw new FabricError(e.message, { code: "invalid_event" });
+      throw e;
+    }
+    const approvalRecord = event === "tool_call" ? built.doc.body.approval_record : undefined;
+    const res = await this.recordAction({ kind, summary: built.payload, idempotencyKey, approvalRecord, event: { event, runId } });
+    return { ...res, record: res.payload_sha256, event, kind, ...(event === "tool_call" || event === "approval" ? { action_sha256: built.doc.body.action_sha256 } : {}) };
+  }
+
+  /**
+   * Gather saved agent events that have proofs into one bundle
+   * (augmentev/fabric-agent-events/v1) for `augmentev-verify agent-events`. Free.
+   * Selects by run id or by log indices; refuses when a selected event has no
+   * proof yet, since a bundle missing a linked record does not verify.
+   */
+  exportEvents({ runId, indices }) {
+    if (!runId && !indices?.length) throw new FabricError("Give a run_id or a list of indices.");
+    const root = this.recordsRoot();
+    const want = indices ? new Set(indices.map(String)) : null;
+    const picked = [];
+    for (const name of readdirSync(root)) {
+      if (!/^\d+$/.test(name) || (want && !want.has(name))) continue; // conflict folders are never bundled
+      let rec;
+      try { rec = JSON.parse(readFileSync(join(root, name, "record.json"), "utf8")); } catch { continue; }
+      if (!rec.event || (runId && rec.run_id !== runId)) continue;
+      picked.push({ index: Number(name), dir: join(root, name), rec });
+    }
+    if (want) {
+      const found = new Set(picked.map((p) => String(p.index)));
+      const absent = [...want].filter((i) => !found.has(i));
+      if (absent.length) throw new FabricError(`No saved agent event at index ${absent.slice(0, 10).join(", ")} (only events recorded from this machine can be bundled).`);
+    }
+    if (!picked.length) throw new FabricError(`No saved agent events${runId ? ` for run ${clean(runId, 64)}` : ""}.`);
+    if (picked.length > 1000) throw new FabricError("A bundle holds at most 1000 events; select fewer.");
+    const unproven = picked.filter((p) => !existsSync(join(p.dir, "proof.json"))).map((p) => p.index);
+    if (unproven.length) throw new FabricError(`Fetch the proofs first with get_proof for index ${unproven.slice(0, 20).join(", ")}${unproven.length > 20 ? " and more" : ""}.`, { code: "proof_pending" });
+    picked.sort((a, b) => a.index - b.index);
+    const records = picked.map(({ dir, rec }) => ({
+      proof: JSON.parse(readFileSync(join(dir, "proof.json"), "utf8")),
+      salt_hex: rec.salt_hex,
+      payload_b64: Buffer.from(rec.payload, "utf8").toString("base64"),
+      audit: JSON.parse(readFileSync(join(dir, "agent-record.json"), "utf8")),
+    }));
+    const outDir = join(this.cfg.home, "bundles");
+    ensurePrivateDir(outDir);
+    const file = join(outDir, `events-${runId ? runId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 64) : "selection"}-${Date.now()}.json`);
+    writePrivate(file, JSON.stringify({ format: BUNDLE_FORMAT, records }, null, 2));
+    return { saved_to: file, events: records.length, first_index: picked[0].index, last_index: picked.at(-1).index };
   }
 
   /** Fetch the proof for one record; optionally wait for it. Free. */
