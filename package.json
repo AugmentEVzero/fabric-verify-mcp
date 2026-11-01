@@ -1,6 +1,6 @@
 {
   "name": "@augmentev/fabric-verify-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server for Fabric Verify: your agent signs a record of each action locally and gets a public, offline-checkable proof that the record existed, unchanged, by a certain time.",
   "mcpName": "ai.augmentev/fabric-verify",
   "type": "module",

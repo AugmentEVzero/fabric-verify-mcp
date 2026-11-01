@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { BUNDLE_FORMAT, EventError, buildEvent, eventKind } from "./agent-event.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.2.1";
 export const CONTEXT = "augmentev-fabric-log-statement-v1\n";
 export const KINDS = [
   "tool_call", "model_output", "message_sent", "data_read", "data_write", "file_write",

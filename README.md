@@ -71,7 +71,7 @@ augmentev-verify log-proof proof.json --pins fabric-log-v1.json --audit agent-re
 
 ## Pin the version
 
-For production agents, pin an exact version, such as `npx -y @augmentev/fabric-verify-mcp@0.2.0`, and update deliberately. The package ships a lockfile (`npm-shrinkwrap.json`) so its dependencies are fixed too.
+For production agents, pin an exact version, such as `npx -y @augmentev/fabric-verify-mcp@0.2.1`, and update deliberately. The package ships a lockfile (`npm-shrinkwrap.json`) so its dependencies are fixed too.
 
 ## Keep your agent key
 
